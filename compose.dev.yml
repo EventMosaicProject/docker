@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # Eureka сервер
+  em-discovery:
+    build:
+      context: ../em-discovery
+      dockerfile: Dockerfile
+    ports:
+      - "8761:8761"
+
+  # API Gateway
+  em-gateway:
+    build:
+      context: ../em-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - em-discovery
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - esdata_dev:/usr/share/elasticsearch/data
+      - ./elasticsearch/elasticsearch.dev.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+
+  # Redis
+  redis:
+    image: redis:7.4.2
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis/redis.dev.conf:/usr/local/etc/redis/redis.conf:ro  # Монтируем dev конфиг
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]  # Запускаем с нашим конфигом
+
+  # API сервис
+  em-api:
+    build:
+      context: ../em-api
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    depends_on:
+      - elasticsearch
+      - em-discovery
+
+  # Adapter сервис
+  em-adapter:
+    build:
+      context: ../em-adapter
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    depends_on:
+      - em-discovery
+
+  # Collector сервис
+  em-collector:
+    build:
+      context: ../em-collector
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    depends_on:
+      - em-discovery
+
+  # Processor сервис
+  em-processor:
+    build:
+      context: ../em-processor
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8080"
+    depends_on:
+      - em-discovery
+      - redis
+
+volumes:
+  esdata_dev:
+    driver: local

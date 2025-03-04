@@ -1,0 +1,48 @@
+# Конфигурация Elasticsearch для prod-окружения
+
+# Основные настройки кластера
+cluster.name: ${CLUSTER_NAME:em-production-cluster}                                                   # Уникальное имя кластера
+node.name: ${NODE_NAME:node-1}                                                                        # Уникальное имя узла
+
+# Сетевые настройки
+network.host: ${NETWORK_HOST:0.0.0.0}                                                                 # Слушаем все интерфейсы
+http.port: ${HTTP_PORT:9200}                                                                          # Порт для REST API
+transport.port: ${TRANSPORT_PORT:9300}                                                                # Порт для межузлового взаимодействия
+
+# Расширенные настройки безопасности
+xpack.security.enabled: ${SECURITY_ENABLED:true}                                                      # Включаем защиту
+xpack.security.transport.ssl.enabled: true                                                            # Включаем SSL для безопасной связи узлов
+xpack.security.transport.ssl.verification_mode: certificate                                           # Проверяем сертификаты
+xpack.security.transport.ssl.keystore.path: ${SSL_KEYSTORE_PATH:certs/elastic-certificates.p12}       # Путь к хранилищу ключей
+xpack.security.transport.ssl.truststore.path: ${SSL_TRUSTSTORE_PATH:certs/elastic-certificates.p12}   # Путь к доверенным сертификатам
+xpack.security.transport.ssl.keystore.password: ${SSL_KEYSTORE_PASSWORD:cert_password}                # Пароль к хранилищу ключей
+xpack.security.transport.ssl.truststore.password: ${SSL_TRUSTSTORE_PASSWORD:cert_password}            # Пароль к доверенным сертификатам
+
+# Пути хранения
+path.data: ${DATA_PATH:/usr/share/elasticsearch/data}                                                 # Директория с данными
+path.logs: ${LOGS_PATH:/usr/share/elasticsearch/logs}                                                 # Директория с логами
+path.repo: ${BACKUP_PATH:/usr/share/elasticsearch/backup}                                             # Директория для бэкапов
+
+# Оптимизация производительности
+bootstrap.memory_lock: ${MEMORY_LOCK:true}                                                            # Блокируем память от свопа
+indices.memory.index_buffer_size: ${INDEX_BUFFER_SIZE:30%}                                            # Больше памяти на индексацию
+indices.queries.cache.size: ${QUERY_CACHE_SIZE:20%}                                                   # Оптимальный размер кэша запросов
+indices.fielddata.cache.size: ${FIELDDATA_CACHE_SIZE:20%}                                             # Оптимальный размер кэша полей
+
+# Настройки восстановления
+gateway.recover_after_data_nodes: ${GATEWAY_RECOVER_AFTER_NODES:1}                                    # Ждем подключения узлов
+gateway.expected_data_nodes: ${GATEWAY_EXPECTED_NODES:1}                                              # Сколько узлов ожидаем
+gateway.recover_after_time: ${GATEWAY_RECOVER_AFTER_TIME:5m}                                          # Таймаут восстановления
+
+# Режим работы
+discovery.type: ${DISCOVERY_TYPE:single-node}                                                         # Запускаем один узел для простоты
+
+# Мониторинг и метрики
+xpack.monitoring.collection.enabled: ${MONITORING_ENABLED:true}                                       # Включаем сбор метрик
+xpack.monitoring.history.duration: ${MONITORING_HISTORY_DURATION:7d}                                  # Храним историю неделю
+
+# Контроль диска
+cluster.routing.allocation.disk.threshold_enabled: ${DISK_THRESHOLD_ENABLED:true}                     # Следим за местом
+cluster.routing.allocation.disk.watermark.low: ${DISK_WATERMARK_LOW:85%}                              # Предупреждение при 85%
+cluster.routing.allocation.disk.watermark.high: ${DISK_WATERMARK_HIGH:90%}                            # Блокировка при 90%
+

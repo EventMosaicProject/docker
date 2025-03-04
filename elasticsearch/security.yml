@@ -1,0 +1,30 @@
+# Настройки аутентификации
+xpack.security.authc:
+  anonymous:
+    username: anonymous_user                           # Пользователь для неавторизованных запросов
+    roles: viewer                                      # Что может делать аноним
+    authz_exception: false                             # Нельзя обойти ограничения
+
+  # Настройка способов аутентификации
+  realms:
+    native:                                            # Пользователи хранятся в Elasticsearch
+      native1:
+        order: 0                                       # Проверяем первым
+    file:                                              # Пользователи хранятся в файлах
+      file1:
+        order: 1                                       # Проверяем вторым
+
+# Настройки авторизации
+xpack.security.authz:
+  store:
+    allow_restricted_indices: false                    # Запрещаем доступ к системным индексам
+
+# Настройки аудита (логирование действий)
+xpack.security.audit.enabled: ${AUDIT_ENABLED:-true}   # Включаем аудит действий
+xpack.security.audit.logfile:
+  events.include:                                      # Какие события логировать
+    - "authentication_success"                         # Успешная аутентификация
+    - "authentication_failure"                         # Неудачная аутентификация
+    - "access_denied"                                  # Отказ в доступе
+  events.exclude:                                      # Какие события игнорировать
+    - "system_access"                                  # Системные обращения

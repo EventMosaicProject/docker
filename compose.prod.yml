@@ -1,0 +1,156 @@
+version: '3.8'
+
+services:
+  # Eureka сервер
+  em-discovery:
+    build:
+      context: ../em-discovery
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/discovery.prod.env
+    ports:
+      - "8761:8761"
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # API Gateway
+  em-gateway:
+    build:
+      context: ../em-gateway
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/gateway.prod.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - em-discovery
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
+    env_file:
+      - ./env/elasticsearch.prod.env
+    environment:
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-secret}
+      - ELASTIC_USERNAME=elastic
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data                                                        # Том для постоянного хранения данных
+      - ./elasticsearch/elasticsearch.prod.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro # Монтирование кастомного файла конфигурации
+      - ./elasticsearch/security.yml:/usr/share/elasticsearch/config/security.yml:ro                # Добавляем файл безопасности
+      - ./elasticsearch/certs:/usr/share/elasticsearch/config/certs:ro                              # Монтируем директорию с сертификатами
+    restart: always
+
+  # Redis
+  redis:
+    image: redis:7.4.2
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data:rw                                                                          # Постоянное хранение данных Redis между перезапусками
+      - ./redis/redis.prod.conf:/usr/local/etc/redis/redis.conf:ro                                  # Подключаем защищённую конфигурацию Redis
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-password}
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]                                                          # Проверка через ping
+      interval: 30s                                                                                 # Интервал проверки
+      timeout: 10s                                                                                  # Таймаут ожидания ответа
+      retries: 3                                                                                    # Количество попыток
+
+  # API сервис
+  em-api:
+    build:
+      context: ../em-api
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/api.prod.env
+    expose:
+      - "8080"                                                                                     # Работает внутри сети, порт публиковать не нужно
+    depends_on:
+      - elasticsearch
+      - em-discovery
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Adapter сервис
+  em-adapter:
+    build:
+      context: ../em-adapter
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/adapter.prod.env
+    expose:
+      - "8080"
+    depends_on:
+      - em-discovery
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Collector сервис
+  em-collector:
+    build:
+      context: ../em-collector
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/collector.prod.env
+    expose:
+      - "8080"
+    depends_on:
+      - em-discovery
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Processor сервис
+  em-processor:
+    build:
+      context: ../em-processor
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/processor.prod.env
+    expose:
+      - "8080"
+    depends_on:
+      - em-discovery
+      - redis
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  esdata:
+    driver: local
+  redisdata:
+    driver: local                                                                           # Локальное хранение данных Redis

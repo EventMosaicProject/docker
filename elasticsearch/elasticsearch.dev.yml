@@ -1,0 +1,32 @@
+# Конфигурация Elasticsearch для dev-окружения
+
+# Основные настройки кластера
+cluster.name: ${CLUSTER_NAME:em-dev-cluster}                # Имя кластера
+node.name: ${NODE_NAME:node-dev}                            # Имя узла
+
+# Сетевые настройки
+network.host: ${NETWORK_HOST:127.0.0.1}                     # Слушаем только локальный интерфейс для безопасности
+http.port: ${HTTP_PORT:9200}                                # Порт для REST API (поиск, индексация)
+transport.port: ${TRANSPORT_PORT:9300}                      # Порт для связи между узлами
+
+# Настройки безопасности
+xpack.security.enabled: ${SECURITY_ENABLED:false}           # Отключаем для удобства разработки
+xpack.security.transport.ssl.enabled: false                 # SSL не нужен в dev-режиме
+
+# Пути для данных и логов
+path.data: ${DATA_PATH:-/usr/share/elasticsearch/data}      # Где хранятся индексы
+path.logs: ${LOGS_PATH:-/usr/share/elasticsearch/logs}      # Где хранятся логи
+
+# Режим работы
+discovery.type: ${DISCOVERY_TYPE:single-node}               # Запускаем один узел для простоты
+
+# Настройки для удобства разработки
+action.destructive_requires_name: false                     # Разрешаем удалять индексы по маске *
+http.cors.enabled: true                                     # Разрешаем кросс-доменные запросы
+http.cors.allow-origin: "*"                                 # Разрешаем запросы с любых доменов
+
+# Оптимизация памяти
+bootstrap.memory_lock: ${MEMORY_LOCK:false}                 # Не блокируем память в dev
+indices.memory.index_buffer_size: ${INDEX_BUFFER_SIZE:10%}  # Меньше памяти на буфер индексации
+indices.queries.cache.size: ${QUERY_CACHE_SIZE:10%}         # Меньше памяти на кэш запросов
+indices.fielddata.cache.size: ${FIELDDATA_CACHE_SIZE:10%}   # Меньше памяти на кэш полей
