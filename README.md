@@ -10,6 +10,7 @@
 docker/  
 ├── elasticsearch/               # Конфигурации Elasticsearch  
 ├── redis/                       # Конфигурации Redis  
+├── prometheus/                  # Конфигурации Prometheus  
 ├── env/                         # Файлы переменных окружения  
 ├── compose.dev.yml              # Docker Compose для разработки  
 ├── compose.prod.yml             # Docker Compose для продакшена  
@@ -29,6 +30,7 @@ docker/
 ### Инфраструктурные сервисы
 - `elasticsearch` - Хранение и поиск данных (порты 9200, 9300)
 - `redis` - Хранение флага о готовности данных к обработке (порт 6379)
+- `prometheus` - Система мониторинга и сбора метрик (порт 9090)
 ---
 
 ## Конфигурация Elasticsearch
@@ -52,6 +54,28 @@ docker/
 - `elasticsearch.prod.yml` - конфиги для prod
 - `elasticsearch.dev.yml` - конфиги для dev
 - `security.yml` - конфиги безопасности
+---
+
+## Конфигурация Prometheus
+
+### Обзор
+Prometheus используется для сбора метрик со всех микросервисов через Spring Boot Actuator.
+
+### Настройка
+1. Все микросервисы имеют зависимость `micrometer-registry-prometheus` для экспорта метрик
+2. Actuator в каждом сервисе настроен на порт 8081 и экспортирует эндпоинт `/actuator/prometheus`
+3. Prometheus автоматически обнаруживает сервисы через Eureka
+
+### Конфигурация
+- `prometheus.yml` - основной конфигурационный файл Prometheus
+- Для Eureka Server используется статическая конфигурация
+- Для остальных сервисов используется автоматическое обнаружение через Eureka
+
+### Доступ к метрикам
+- Веб-интерфейс Prometheus: `http://localhost:9090`
+- Список целей мониторинга: `http://localhost:9090/targets`
+- Обнаруженные сервисы: `http://localhost:9090/service-discovery`
+
 ---
 ## Запуск и остановка
 
