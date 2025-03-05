@@ -80,6 +80,23 @@ services:
       - em-discovery
       - redis
 
+  # Prometheus - система мониторинга и сбора метрик
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    ports:
+      - "9090:9090"                                                                               # Порт для доступа к веб-интерфейсу Prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro                             # Монтируем наш кастомный конфиг файл
+      - prometheus_data_dev:/prometheus                                                           # Том для хранения данных
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'                                            # Путь к конфиг файлу
+      - '--storage.tsdb.path=/prometheus'                                                         # Путь для хранения данных
+      - '--web.console.libraries=/etc/prometheus/console_libraries'                               # Путь к js-библиотекам консоли
+      - '--web.console.templates=/etc/prometheus/consoles'                                        # Путь к html-шаблонам консоли
+      - '--web.enable-lifecycle'                                                                  # Включение API жизненного цикла
+
 volumes:
   esdata_dev:
+    driver: local
+  prometheus_data_dev:                                                                            # Том для хранения данных Prometheus в dev среде
     driver: local

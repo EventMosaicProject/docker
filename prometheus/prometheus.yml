@@ -1,0 +1,29 @@
+# Глобальные настройки
+global:
+  scrape_interval: 15s                                         # Интервал сбора метрик
+  evaluation_interval: 15s                                     # Интервал вычисления правил
+
+# Конфигурация сбора метрик
+scrape_configs:
+  - job_name: 'prometheus'                                     # Сбор метрик самого Prometheus
+    static_configs:
+      - targets: ['localhost:9090']                            # Адрес и порт Prometheus
+
+  # Отдельно собираем для сервиса обнаружения
+  - job_name: 'em-discovery'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: [ 'em-discovery:8081' ]
+
+  - job_name: 'event-mosaic'                                   # Сбор метрик Spring Boot приложений
+    metrics_path: '/actuator/prometheus'                       # Путь к эндпоинту метрик
+    eureka_sd_configs:
+      - server: http://em-discovery:8761/eureka                # Адрес Eureka сервера для обнаружения сервисов
+    relabel_configs:
+      - source_labels: [__meta_eureka_app_name]                # Использование имени приложения из Eureka
+        target_label: application                              # Установка метки application
+      # Изменяем порт с 8080 на 8081 для всех сервисов
+      - source_labels: [ __address__ ]                         # Используем адрес сервиса
+        regex: '([^:]+)(?::\d+)?'                              # Регулярное выражение для поиска порта
+        replacement: '${1}:8081'                               # Замена порта на 8081
+        target_label: __address__                              # Установка нового значения порта

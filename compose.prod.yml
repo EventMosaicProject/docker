@@ -149,8 +149,36 @@ services:
       timeout: 10s
       retries: 3
 
+  # Prometheus - система мониторинга и сбора метрик
+  prometheus:
+    image: prom/prometheus:v2.48.1                                                          # Используем стабильную версию Prometheus
+    env_file:
+      - ./env/prometheus.prod.env                                                           # Файл с переменными окружения
+    ports:
+      - "9090:9090"                                                                         # Порт для доступа к веб-интерфейсу Prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro                       # Монтируем конфигурационный файл
+      - prometheus_data:/prometheus                                                         # Том для хранения данных
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'                                      # Путь к конфигурационному файлу
+      - '--storage.tsdb.path=/prometheus'                                                   # Путь для хранения данных
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}'                   # Время хранения данных (по умолчанию 15 дней)
+      - '--web.console.libraries=/etc/prometheus/console_libraries'                         # Путь к js-библиотекам консоли
+      - '--web.console.templates=/etc/prometheus/consoles'                                  # Путь к html-шаблонам консоли
+      - '--web.enable-lifecycle'                                                            # Включение API жизненного цикла
+      - '--web.enable-admin-api=${PROMETHEUS_WEB_ENABLE_ADMIN_API:-false}'                  # Включение/отключение админ API
+    restart: always                                                                         # Всегда перезапускать контейнер
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy" ]          # Проверка здоровья сервиса
+      interval: 30s                                                                         # Интервал проверки
+      timeout: 10s                                                                          # Таймаут ожидания ответа
+      retries: 3                                                                            # Количество попыток
+
+
 volumes:
   esdata:
     driver: local
   redisdata:
     driver: local                                                                           # Локальное хранение данных Redis
+  prometheus_data:                                                                          # Том для хранения данных Prometheus
+    driver: local
