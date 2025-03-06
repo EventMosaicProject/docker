@@ -51,7 +51,7 @@ services:
         soft: -1
         hard: -1
     volumes:
-      - esdata:/usr/share/elasticsearch/data                                                        # Том для постоянного хранения данных
+      - es_data:/usr/share/elasticsearch/data                                                       # Том для постоянного хранения данных
       - ./elasticsearch/elasticsearch.prod.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro # Монтирование кастомного файла конфигурации
       - ./elasticsearch/security.yml:/usr/share/elasticsearch/config/security.yml:ro                # Добавляем файл безопасности
       - ./elasticsearch/certs:/usr/share/elasticsearch/config/certs:ro                              # Монтируем директорию с сертификатами
@@ -64,7 +64,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redisdata:/data:rw                                                                          # Постоянное хранение данных Redis между перезапусками
+      - redis_data:/data:rw                                                                         # Постоянное хранение данных Redis между перезапусками
       - ./redis/redis.prod.conf:/usr/local/etc/redis/redis.conf:ro                                  # Подключаем защищённую конфигурацию Redis
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-password}
@@ -151,14 +151,14 @@ services:
 
   # Prometheus - система мониторинга и сбора метрик
   prometheus:
-    image: prom/prometheus:v2.48.1                                                          # Используем стабильную версию Prometheus
+    image: prom/prometheus:v2.48.1
     env_file:
-      - ./env/prometheus.prod.env                                                           # Файл с переменными окружения
+      - ./env/prometheus.prod.env
     ports:
-      - "9090:9090"                                                                         # Порт для доступа к веб-интерфейсу Prometheus
+      - "9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro                       # Монтируем конфигурационный файл
-      - prometheus_data:/prometheus                                                         # Том для хранения данных
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'                                      # Путь к конфигурационному файлу
       - '--storage.tsdb.path=/prometheus'                                                   # Путь для хранения данных
@@ -174,11 +174,38 @@ services:
       timeout: 10s                                                                          # Таймаут ожидания ответа
       retries: 3                                                                            # Количество попыток
 
+  # Grafana - система визуализации метрик
+  grafana:
+    image: grafana/grafana:10.4.0
+    env_file:
+      - ./env/grafana.prod.env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro                                   # Монтируем кастомный конфиг файл
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro                                 # Монтируем директорию с настройками
+      - grafana_data:/var/lib/grafana                                                       # Том для хранения данных
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}                                 # Имя пользователя из переменной окружения
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}                         # Пароль из переменной окружения
+      - GF_USERS_ALLOW_SIGN_UP=false                                                        # Запрещаем регистрацию новых пользователей
+      - GF_AUTH_ANONYMOUS_ENABLED=false                                                     # Отключаем анонимный доступ в продакшн
+    depends_on:
+      - prometheus                                                                          # Зависимость от Prometheus
+    restart: always                                                                         # Всегда перезапускать контейнер
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
 volumes:
-  esdata:
+  es_data:
     driver: local
-  redisdata:
+  redis_data:
     driver: local                                                                           # Локальное хранение данных Redis
   prometheus_data:                                                                          # Том для хранения данных Prometheus
+    driver: local
+  grafana_data:                                                                             # Том для хранения данных Grafana
     driver: local

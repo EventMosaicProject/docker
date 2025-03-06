@@ -26,7 +26,7 @@ services:
       - "9200:9200"
       - "9300:9300"
     volumes:
-      - esdata_dev:/usr/share/elasticsearch/data
+      - es_data_dev:/usr/share/elasticsearch/data
       - ./elasticsearch/elasticsearch.dev.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
 
   # Redis
@@ -35,8 +35,8 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - ./redis/redis.dev.conf:/usr/local/etc/redis/redis.conf:ro  # Монтируем dev конфиг
-    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]  # Запускаем с нашим конфигом
+      - ./redis/redis.dev.conf:/usr/local/etc/redis/redis.conf:ro                                # Монтируем dev конфиг
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]                                 # Запускаем с нашим конфигом
 
   # API сервис
   em-api:
@@ -84,19 +84,37 @@ services:
   prometheus:
     image: prom/prometheus:v3.2.1
     ports:
-      - "9090:9090"                                                                               # Порт для доступа к веб-интерфейсу Prometheus
+      - "9090:9090"
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro                             # Монтируем наш кастомный конфиг файл
-      - prometheus_data_dev:/prometheus                                                           # Том для хранения данных
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data_dev:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'                                            # Путь к конфиг файлу
       - '--storage.tsdb.path=/prometheus'                                                         # Путь для хранения данных
       - '--web.console.libraries=/etc/prometheus/console_libraries'                               # Путь к js-библиотекам консоли
       - '--web.console.templates=/etc/prometheus/consoles'                                        # Путь к html-шаблонам консоли
-      - '--web.enable-lifecycle'                                                                  # Включение API жизненного цикла
+      - '--web.enable-lifecycle'
+
+  # Grafana - система визуализации метрик
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports:
+      - "3000:3000"                                                                               # Порт для доступа к веб-интерфейсу Grafana
+    volumes:
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro                                         # Монтируем кастомный конфиг файл
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro                                       # Монтируем директорию с настройками
+      - grafana_data_dev:/var/lib/grafana                                                         # Том для хранения данных
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin                                                              # Имя пользователя по умолчанию
+      - GF_SECURITY_ADMIN_PASSWORD=admin                                                          # Пароль по умолчанию (изменить в продакшн)
+      - GF_USERS_ALLOW_SIGN_UP=false                                                              # Запрещаем регистрацию новых пользователей
+    depends_on:
+      - prometheus                                                                                # Зависимость от Prometheus# Включение API жизненного цикла
 
 volumes:
-  esdata_dev:
+  es_data_dev:
     driver: local
   prometheus_data_dev:                                                                            # Том для хранения данных Prometheus в dev среде
+    driver: local
+  grafana_data_dev:                                                                               # Том для хранения данных Grafana в dev среде
     driver: local

@@ -15,7 +15,7 @@ scrape_configs:
     static_configs:
       - targets: [ 'em-discovery:8081' ]
 
-  - job_name: 'event-mosaic'                                   # Сбор метрик Spring Boot приложений
+  - job_name: 'event-mosaic'                                   # Сбор метрик приложений
     metrics_path: '/actuator/prometheus'                       # Путь к эндпоинту метрик
     eureka_sd_configs:
       - server: http://em-discovery:8761/eureka                # Адрес Eureka сервера для обнаружения сервисов

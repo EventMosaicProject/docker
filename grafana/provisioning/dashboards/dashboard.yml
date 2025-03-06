@@ -1,0 +1,13 @@
+# Конфигурация для автоматической загрузки дашбордов
+apiVersion: 1
+
+providers:
+  # Провайдер для дашбордов приложений
+  - name: 'Event Mosaic Dashboards'                 # Имя провайдера
+    orgId: 1                                        # Идентификатор организации
+    folder: 'Event Mosaic'                          # Папка для дашбордов
+    type: file                                      # Тип провайдера
+    disableDeletion: false                          # Разрешить удаление
+    editable: true                                  # Разрешить редактирование
+    options:
+      path: /etc/grafana/provisioning/dashboards    # Путь к дашбордам

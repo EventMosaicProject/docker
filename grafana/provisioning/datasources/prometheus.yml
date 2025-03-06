@@ -1,0 +1,15 @@
+# Конфигурация источников данных для Grafana
+apiVersion: 1
+
+# Список источников данных
+datasources:
+  # Prometheus как основной источник метрик
+  - name: Prometheus                    # Имя источника
+    type: prometheus                    # Тип источника
+    access: proxy                       # Тип доступа
+    url: http://prometheus:9090         # Адрес Prometheus
+    isDefault: true                     # Использовать по умолчанию
+    editable: false                     # Не редактируемый
+    jsonData:
+      timeInterval: 15s                 # Интервал обновления данных
+      httpMethod: GET                   # Метод запроса
