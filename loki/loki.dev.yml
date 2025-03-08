@@ -1,0 +1,56 @@
+# Глобальные настройки Loki для DEV-окружения
+auth_enabled: false                                                # Отключаем аутентификацию для простоты разработки
+
+# Конфигурация сервера
+server:
+  http_listen_port: 3100                                          # Порт для HTTP API
+
+# Конфигурация ингестора (компонент, принимающий логи)
+ingester:
+  lifecycler:
+    address: 127.0.0.1                                            # Адрес для внутренней коммуникации
+    ring:
+      kvstore:
+        store: inmemory                                           # Хранилище в памяти для dev-среды
+      replication_factor: 1                                       # Фактор репликации (1 для dev)
+    final_sleep: 0s                                               # Время ожидания перед завершением
+  chunk_idle_period: 5m                                           # Период простоя чанка
+  chunk_retain_period: 30s                                        # Период удержания чанка
+
+# Конфигурация схемы
+schema_config:
+  configs:
+    - from: 2020-10-24                                            # Дата начала действия схемы
+      store: boltdb-shipper                                       # Тип хранилища
+      object_store: filesystem                                    # Тип объектного хранилища (файловая система для dev)
+      schema: v11                                                 # Версия схемы
+      index:
+        prefix: index_                                            # Префикс для индексных файлов
+        period: 24h                                               # Период ротации индексов
+
+# Конфигурация хранилища
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /loki/boltdb-shipper-active          # Директория для активных индексов
+    cache_location: /loki/boltdb-shipper-cache                   # Директория для кэша
+    cache_ttl: 24h                                               # Время жизни кэша
+  filesystem:
+    directory: /loki/chunks                                      # Директория для хранения чанков
+
+# Конфигурация лимитов (более мягкие для dev)
+limits_config:
+  allow_structured_metadata: false                                # Отключаем поддержку структурированных метаданных
+  reject_old_samples: true                                        # Отклонять старые сэмплы
+  reject_old_samples_max_age: 168h                                # Максимальный возраст старых сэмплов (7 дней)
+  ingestion_rate_mb: 10                                           # Ограничение скорости приема данных (10 MB/s)
+  ingestion_burst_size_mb: 20                                     # Размер всплеска приема данных (20 MB)
+
+# Конфигурация таблиц
+table_manager:
+  retention_deletes_enabled: true                                 # Включить удаление по истечении срока хранения
+  retention_period: 168h                                          # Период хранения (7 дней для dev)
+
+# Конфигурация компактора
+compactor:
+  working_directory: /loki/compactor                              # Рабочая директория компактора
+  compaction_interval: 10m                                        # Интервал компактирования (чаще для dev) 

@@ -48,6 +48,10 @@ services:
     depends_on:
       - elasticsearch
       - em-discovery
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
   # Adapter сервис
   em-adapter:
@@ -58,6 +62,10 @@ services:
       - "8082:8080"
     depends_on:
       - em-discovery
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
   # Collector сервис
   em-collector:
@@ -68,6 +76,10 @@ services:
       - "8083:8080"
     depends_on:
       - em-discovery
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
   # Processor сервис
   em-processor:
@@ -79,6 +91,10 @@ services:
     depends_on:
       - em-discovery
       - redis
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
   # Prometheus - система мониторинга и сбора метрик
   prometheus:
@@ -108,13 +124,52 @@ services:
       - GF_SECURITY_ADMIN_USER=admin                                                              # Имя пользователя по умолчанию
       - GF_SECURITY_ADMIN_PASSWORD=admin                                                          # Пароль по умолчанию (изменить в продакшн)
       - GF_USERS_ALLOW_SIGN_UP=false                                                              # Запрещаем регистрацию новых пользователей
+      - GF_FEATURE_TOGGLES_ENABLE=lokiLive,lokiLogRowContext                                      # Включаем только функции для работы с логами
     depends_on:
-      - prometheus                                                                                # Зависимость от Prometheus# Включение API жизненного цикла
+      - prometheus                                                                                # Зависимость от Prometheus
+      - loki                                                                                      # Зависимость от Loki
+
+  # Loki - система сбора и хранения логов
+  loki:
+    image: grafana/loki:3.4.2
+    ports:
+      - "3100:3100"                                                                               # Порт для API Loki
+    volumes:
+      - ./loki/loki.dev.yml:/etc/loki/loki.dev.yml:ro                                             # Монтируем конфигурационный файл
+      - loki_data_dev:/loki                                                                       # Том для хранения данных
+      - loki_wal_dev:/wal                                                                         # Том для WAL директории
+    command: >
+      -config.file=${LOKI_CONFIG_PATH:-/etc/loki/loki.dev.yml}
+      -log.level=${LOG_LEVEL:-info}
+      -validation.allow-structured-metadata=false                                                 # Отключаем проверку структурированных метаданных
+    user: "0"                                                                                     # Запускаем от имени root для решения проблем с правами
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+
+  # Promtail - агент для сбора логов
+  promtail:
+    image: grafana/promtail:3.4.2
+    volumes:
+      - ./promtail/promtail.dev.yml:/etc/promtail/promtail.dev.yml:ro                             # Монтируем конфигурационный файл
+      - ./logs:/logs:ro                                                                           # Доступ к логам микросервисов (только чтение)
+      - /var/log:/var/log:ro                                                                      # Доступ к логам хоста (только чтение)
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro                                  # Доступ к логам контейнеров (только чтение)
+    command: >
+      -config.file=${PROMTAIL_CONFIG_PATH:-/etc/promtail/promtail.dev.yml}
+      -log.level=${LOG_LEVEL:-info}
+    depends_on:
+      - loki                                                                                      # Зависимость от Loki
 
 volumes:
-  es_data_dev:
+  es_data_dev:                                                                                    # Том для хранения данных Elasticsearch в dev среде
     driver: local
   prometheus_data_dev:                                                                            # Том для хранения данных Prometheus в dev среде
     driver: local
   grafana_data_dev:                                                                               # Том для хранения данных Grafana в dev среде
+    driver: local
+  loki_data_dev:                                                                                  # Том для хранения данных Loki в dev среде
+    driver: local
+  loki_wal_dev:                                                                                   # Том для хранения WAL Loki в dev среде
     driver: local

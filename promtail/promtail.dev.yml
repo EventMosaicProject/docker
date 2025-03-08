@@ -1,0 +1,111 @@
+server:
+  http_listen_port: 9080                                          # Порт для HTTP API и метрик
+  grpc_listen_port: 0                                             # Отключаем gRPC (0 = отключено)
+  log_level: debug                                                # Уровень логирования (debug для dev)
+
+# Настройки позиций (отслеживание прогресса чтения файлов)
+positions:
+  filename: /tmp/positions.yaml                                   # Файл для хранения позиций чтения логов
+  sync_period: 10s                                                # Период синхронизации позиций на диск
+
+# Настройки клиента для отправки логов в Loki
+clients:
+  - url: http://loki:3100/loki/api/v1/push                        # URL API Loki для отправки логов
+    tenant_id: "dev-tenant"                                       # ID тенанта для dev-окружения
+    batchwait: 1s                                                 # Максимальное время ожидания перед отправкой батча
+    batchsize: 1048576                                            # Максимальный размер батча в байтах (1MB)
+    follow_redirects: true                                        # Следовать за редиректами
+    timeout: 10s                                                  # Таймаут запроса
+    backoff_config:                                               # Настройки повторных попыток при ошибках
+      min_period: 500ms                                           # Минимальный период между попытками
+      max_period: 5m                                              # Максимальный период между попытками
+      max_retries: 10                                             # Максимальное количество попыток
+
+# Настройки скрейпинга (сбора) логов
+scrape_configs:
+  # Сбор логов из файлов JSON (для наших микросервисов)
+  - job_name: microservices_logs
+    static_configs:
+      - targets:
+          - localhost                                             # Цель для сбора (используется для меток)
+        labels:
+          job: microservices                                      # Метка job для идентификации источника
+          environment: dev                                        # Метка environment (dev)
+          __path__: /logs/*.json                                  # Путь к файлам логов (используем маску для всех JSON файлов)
+    
+    # Настройки для разбора JSON логов
+    pipeline_stages:
+      - json:                                                     # Стадия разбора JSON
+          expressions:                                            # Извлекаем поля из JSON
+            timestamp: timestamp
+            level: level
+            message: message
+            logger: logger
+            thread: thread
+            service: service
+            traceId: traceId
+            spanId: spanId
+            userId: userId
+            requestId: requestId
+            exception: exception                                  # Поле exception
+            stack_trace: stack_trace                              # Поле stack_trace
+            exception_message: exception_message                  # Сообщение исключения
+            exception_class: exception_class                      # Класс исключения
+            exception_details: exception_details                  # Детали исключения из MDC
+      
+      - timestamp:                                                # Стадия обработки временной метки
+          source: timestamp                                       # Исходное поле с временной меткой
+          format: RFC3339                                         # Формат временной метки (ISO8601/RFC3339)
+      
+      - labels:                                                   # Стадия добавления меток из полей
+          service: service                                        # Метка service из поля service
+          level: level                                            # Метка level из поля level
+          traceId: traceId                                        # Метка traceId из поля traceId
+      
+      - template:                                                 # Стадия шаблонизации для соединения сообщения и стектрейса
+          source: output                                          # Поле для вывода
+          template: '{{ .message }}{{ if .exception }} Exception: {{ .exception }}{{ end }}{{ if .stack_trace }} Stack Trace: {{ .stack_trace }}{{ end }}'
+      
+      - output:                                                   # Стадия форматирования вывода
+          source: output                                          # Используем сформированное output поле как основной вывод
+
+  # Сбор логов из стандартных файлов журнала Docker
+  - job_name: docker_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          environment: dev
+          __path__: /var/lib/docker/containers/*/*.log            # Путь к логам контейнеров Docker
+    
+    # Настройки для разбора логов Docker
+    pipeline_stages:
+      - json:                                                     # Стадия разбора JSON (логи Docker в формате JSON)
+          expressions:
+            log: log                                              # Извлекаем поле log (содержимое лога)
+            stream: stream                                        # Извлекаем поле stream (stdout/stderr)
+            time: time                                            # Извлекаем поле time (временная метка)
+      
+      - timestamp:                                                # Стадия обработки временной метки
+          source: time                                            # Исходное поле с временной меткой
+          format: RFC3339Nano                                     # Формат временной метки Docker
+      
+      - regex:                                                    # Стадия извлечения имени контейнера из пути к файлу
+          expression: '/var/lib/docker/containers/(?P<container_id>[^/]+)/.*.log'
+          source: filename
+      
+      - docker:                                                   # Стадия получения метаданных Docker
+          container_name_label: container_name                    # Метка для имени контейнера
+          stream_label: stream                                    # Метка для потока (stdout/stderr)
+      
+      - labels:                                                   # Стадия добавления меток
+          stream:                                                 # Метка stream из поля stream
+          container_id:                                           # Метка container_id из регулярного выражения
+          container_name:                                         # Метка container_name из Docker
+      
+      - output:                                                   # Стадия форматирования вывода
+          source: log                                             # Используем поле log как основное содержимое лога
+
+# Настройки лимитов (более мягкие для dev)
+limits_config:

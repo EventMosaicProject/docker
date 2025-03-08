@@ -1,0 +1,18 @@
+apiVersion: 1
+
+# Список источников данных для добавления или обновления
+datasources:
+  # Loki как источник данных для логов
+  - name: Loki                            # Имя источника данных
+    type: loki                            # Тип источника данных
+    access: proxy                         # Доступ через прокси сервер Grafana
+    url: http://loki:3100                 # URL Loki в сети Docker
+    jsonData:
+      maxLines: 1000                      # Максимальное количество строк логов для запроса
+      derivedFields:                      # Производные поля для создания ссылок на трейсы
+        - name: traceID                   # Имя поля
+          matcherRegex: "traceId=(\\w+)"  # Регулярное выражение для извлечения traceID
+          url: "${__value.raw}"           # URL для перехода по traceID
+    version: 1                            # Версия источника данных
+    uid: loki                             # Уникальный идентификатор источника данных
+    editable: true                        # Возможность редактирования в UI Grafana

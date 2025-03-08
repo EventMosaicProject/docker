@@ -1,0 +1,143 @@
+server:
+  http_listen_port: 9080                                          # Порт для HTTP API и метрик
+  grpc_listen_port: 0                                             # Отключаем gRPC (0 = отключено)
+  log_level: info                                                 # Уровень логирования (info для prod)
+
+# Настройки позиций (отслеживание прогресса чтения файлов)
+positions:
+  filename: /data/positions.yaml                                  # Файл для хранения позиций чтения логов (в постоянном хранилище)
+  sync_period: 10s                                                # Период синхронизации позиций на диск
+
+# Настройки клиента для отправки логов в Loki
+clients:
+  - url: http://loki:3100/loki/api/v1/push                        # URL API Loki для отправки логов
+    tenant_id: "prod-tenant"                                      # ID тенанта для prod-окружения
+    basic_auth:                                                   # Настройки базовой аутентификации
+      username: admin                                             # Имя пользователя (должно совпадать с Loki)
+      password: ${LOKI_PASSWORD:-secure_password}                 # Пароль (должен совпадать с Loki)
+    batchwait: 5s                                                 # Максимальное время ожидания перед отправкой батча (больше для prod)
+    batchsize: 5242880                                            # Максимальный размер батча в байтах (5MB для prod)
+    follow_redirects: true                                        # Следовать за редиректами
+    timeout: 30s                                                  # Таймаут запроса (больше для prod)
+    backoff_config:                                               # Настройки повторных попыток при ошибках
+      min_period: 1s                                              # Минимальный период между попытками
+      max_period: 10m                                             # Максимальный период между попытками
+      max_retries: 20                                             # Максимальное количество попыток (больше для prod)
+
+# Настройки скрейпинга (сбора) логов
+scrape_configs:
+  # Сбор логов из файлов JSON (для наших микросервисов)
+  - job_name: microservices_logs
+    static_configs:
+      - targets:
+          - localhost                                             # Цель для сбора (используется для меток)
+        labels:
+          job: microservices                                      # Метка job для идентификации источника
+          environment: prod                                       # Метка environment (prod)
+          __path__: /var/log/microservices/*.json                 # Путь к файлам логов (используем маску для всех JSON файлов)
+    
+    # Настройки для разбора JSON логов
+    pipeline_stages:
+      - json:                                                     # Стадия разбора JSON
+          expressions:                                            # Извлекаем поля из JSON
+            timestamp: timestamp
+            level: level
+            message: message
+            logger: logger
+            thread: thread
+            service: service
+            traceId: traceId
+            spanId: spanId
+            userId: userId
+            requestId: requestId
+      
+      - timestamp:                                                # Стадия обработки временной метки
+          source: timestamp                                       # Исходное поле с временной меткой
+          format: RFC3339                                         # Формат временной метки (ISO8601/RFC3339)
+      
+      - labels:                                                   # Стадия добавления меток из полей
+          service: service                                        # Метка service из поля service
+          level: level                                            # Метка level из поля level
+          traceId: traceId                                        # Метка traceId из поля traceId
+          spanId: spanId                                          # Метка spanId из поля spanId
+          userId: userId                                          # Метка userId из поля userId (добавлено для prod)
+          requestId: requestId                                    # Метка requestId из поля requestId (добавлено для prod)
+      
+      - output:                                                   # Стадия форматирования вывода
+          source: message                                         # Используем поле message как основное содержимое лога
+
+  # Сбор логов из стандартных файлов журнала Docker
+  - job_name: docker_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          environment: prod
+          __path__: /var/lib/docker/containers/*/*.log            # Путь к логам контейнеров Docker
+    
+    # Настройки для разбора логов Docker
+    pipeline_stages:
+      - json:                                                     # Стадия разбора JSON (логи Docker в формате JSON)
+          expressions:
+            log: log                                              # Извлекаем поле log (содержимое лога)
+            stream: stream                                        # Извлекаем поле stream (stdout/stderr)
+            time: time                                            # Извлекаем поле time (временная метка)
+      
+      - timestamp:                                                # Стадия обработки временной метки
+          source: time                                            # Исходное поле с временной меткой
+          format: RFC3339Nano                                     # Формат временной метки Docker
+      
+      - regex:                                                    # Стадия извлечения имени контейнера из пути к файлу
+          expression: '/var/lib/docker/containers/(?P<container_id>[^/]+)/.*.log'
+          source: filename
+      
+      - docker:                                                   # Стадия получения метаданных Docker
+          container_name_label: container_name                    # Метка для имени контейнера
+          stream_label: stream                                    # Метка для потока (stdout/stderr)
+      
+      - labels:                                                   # Стадия добавления меток
+          stream:                                                 # Метка stream из поля stream
+          container_id:                                           # Метка container_id из регулярного выражения
+          container_name:                                         # Метка container_name из Docker
+      
+      - output:                                                   # Стадия форматирования вывода
+          source: log                                             # Используем поле log как основное содержимое лога
+
+  # Фильтрация логов по уровню для prod (только WARN и выше)
+  - job_name: filtered_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: filtered
+          environment: prod
+          __path__: /var/log/microservices/*.json
+    
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+            service: service
+      
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+      
+      - match:                                                    # Стадия фильтрации по уровню
+          selector: '{level=~"WARN|ERROR|FATAL"}'                 # Выбираем только WARN, ERROR и FATAL
+          stages:
+            - labels:
+                level:
+                service:
+            - output:
+                source: message
+
+# Настройки лимитов (более строгие для prod)
+limits_config:
+
+# Настройки целевого диска (для prod)
+target_config:
+  sync_period: 10s                                                # Период синхронизации целей 

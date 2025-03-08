@@ -113,3 +113,5 @@ env/*.env
 # Игнорируем сертификаты
 elasticsearch/certs/
 
+logs/
+

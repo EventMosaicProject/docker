@@ -151,7 +151,7 @@ services:
 
   # Prometheus - система мониторинга и сбора метрик
   prometheus:
-    image: prom/prometheus:v2.48.1
+    image: prom/prometheus:v3.2.1
     env_file:
       - ./env/prometheus.prod.env
     ports:
@@ -176,7 +176,7 @@ services:
 
   # Grafana - система визуализации метрик
   grafana:
-    image: grafana/grafana:10.4.0
+    image: grafana/grafana:11.5.2
     env_file:
       - ./env/grafana.prod.env
     ports:
@@ -190,8 +190,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}                         # Пароль из переменной окружения
       - GF_USERS_ALLOW_SIGN_UP=false                                                        # Запрещаем регистрацию новых пользователей
       - GF_AUTH_ANONYMOUS_ENABLED=false                                                     # Отключаем анонимный доступ в продакшн
+      - GF_FEATURE_TOGGLES_ENABLE=lokiLive,lokiLogRowContext                                # Включаем только функции для работы с логами
     depends_on:
       - prometheus                                                                          # Зависимость от Prometheus
+      - loki                                                                                # Зависимость от Loki
     restart: always                                                                         # Всегда перезапускать контейнер
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
@@ -199,13 +201,96 @@ services:
       timeout: 10s
       retries: 3
 
+  # Loki - система сбора и хранения логов
+  loki:
+    image: grafana/loki:3.4.2
+    env_file:
+      - ./env/loki.prod.env
+    ports:
+      - "3100:3100"                                                                         # Порт для API Loki
+      - "7946:7946"                                                                         # Порт для memberlist (кластеризация)
+    volumes:
+      - ./loki/loki.prod.yml:/etc/loki/loki.prod.yml:ro                                     # Монтируем конфигурационный файл
+      - loki_data:/loki                                                                     # Том для хранения данных
+      - loki_wal:/wal                                                                       # Том для WAL директории
+    command: >
+      -config.file=${LOKI_CONFIG_PATH:-/etc/loki/loki.prod.yml}
+      -log.level=${LOG_LEVEL:-info}
+      -validation.allow-structured-metadata=false                                           # Отключаем проверку структурированных метаданных
+    user: "0"                                                                               # Запускаем от имени root для решения проблем с правами
+    depends_on:
+      - minio                                                                               # Зависимость от MinIO
+    restart: always                                                                         # Всегда перезапускать контейнер
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Promtail - агент для сбора логов
+  promtail:
+    image: grafana/promtail:3.4.2
+    env_file:
+      - ./env/promtail.prod.env
+    volumes:
+      - ./promtail/promtail.prod.yml:/etc/promtail/promtail.prod.yml:ro                     # Монтируем конфигурационный файл
+      - /var/log:/var/log:ro                                                                # Доступ к логам хоста (только чтение)
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro                            # Доступ к логам контейнеров (только чтение)
+      - promtail_data:/data                                                                 # Том для хранения позиций
+    command: >
+      -config.file=${PROMTAIL_CONFIG_PATH:-/etc/promtail/promtail.prod.yml}
+      -log.level=${LOG_LEVEL:-info}
+    depends_on:
+      - loki                                                                                # Зависимость от Loki
+    restart: always                                                                         # Всегда перезапускать контейнер
+
+  # MinIO - S3-совместимое хранилище. Используется для хранения логов Loki
+  minio:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    env_file:
+      - ./env/minio.prod.env
+    ports:
+      - "9000:9000"                                                                         # Порт для API
+      - "9001:9001"                                                                         # Порт для консоли
+    volumes:
+      - minio_data:/data                                                                    # Том для хранения данных
+    command: server /data --console-address ":9001"                                         # Запуск сервера с консолью
+    restart: always                                                                         # Всегда перезапускать контейнер
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO Client - для создания бакета при первом запуске
+  minio-client:
+    image: minio/mc:RELEASE.2025-02-21T16-00-46Z
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 10;
+      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb --ignore-existing myminio/loki-logs;
+      exit 0;
+      "
+    restart: on-failure                                                                     # Перезапускать только при ошибке
+
 
 volumes:
-  es_data:
+  es_data:                                                                                  # Том для хранения данных Elasticsearch
     driver: local
-  redis_data:
-    driver: local                                                                           # Локальное хранение данных Redis
+  redis_data:                                                                               # Том для хранения данных Redis
+    driver: local
   prometheus_data:                                                                          # Том для хранения данных Prometheus
     driver: local
   grafana_data:                                                                             # Том для хранения данных Grafana
+    driver: local
+  minio_data:                                                                               # Том для хранения данных MinIO
+    driver: local
+  loki_data:                                                                                # Том для хранения данных Loki
+    driver: local
+  loki_wal:                                                                                 # Том для хранения WAL Loki
+    driver: local
+  promtail_data:                                                                            # Том для хранения данных Promtail
     driver: local
