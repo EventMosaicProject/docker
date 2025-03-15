@@ -8,6 +8,10 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8761:8761"
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
   # API Gateway
   em-gateway:
@@ -18,6 +22,10 @@ services:
       - "8080:8080"
     depends_on:
       - em-discovery
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
 
   # Elasticsearch
   elasticsearch:
@@ -141,7 +149,7 @@ services:
     command: >
       -config.file=${LOKI_CONFIG_PATH:-/etc/loki/loki.dev.yml}
       -log.level=${LOG_LEVEL:-info}
-      -validation.allow-structured-metadata=false                                                 # Отключаем проверку структурированных метаданных
+      -validation.allow-structured-metadata=false
     user: "0"                                                                                     # Запускаем от имени root для решения проблем с правами
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
@@ -171,5 +179,5 @@ volumes:
     driver: local
   loki_data_dev:                                                                                  # Том для хранения данных Loki в dev среде
     driver: local
-  loki_wal_dev:                                                                                   # Том для хранения WAL Loki в dev среде
+  loki_wal_dev:                                                                                   # Том для хранения WAL (Write-Ahead Logging) Loki в dev среде
     driver: local

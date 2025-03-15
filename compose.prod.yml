@@ -10,6 +10,8 @@ services:
       - ./env/discovery.prod.env
     ports:
       - "8761:8761"
+    volumes:
+      - ./logs:/app/logs
     restart: always
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
@@ -26,6 +28,8 @@ services:
       - ./env/gateway.prod.env
     ports:
       - "8080:8080"
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - em-discovery
     restart: always
@@ -84,6 +88,8 @@ services:
       - ./env/api.prod.env
     expose:
       - "8080"                                                                                     # Работает внутри сети, порт публиковать не нужно
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - elasticsearch
       - em-discovery
@@ -103,6 +109,8 @@ services:
       - ./env/adapter.prod.env
     expose:
       - "8080"
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - em-discovery
     restart: always
@@ -121,6 +129,8 @@ services:
       - ./env/collector.prod.env
     expose:
       - "8080"
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - em-discovery
     restart: always
@@ -139,6 +149,8 @@ services:
       - ./env/processor.prod.env
     expose:
       - "8080"
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       - em-discovery
       - redis
@@ -216,7 +228,7 @@ services:
     command: >
       -config.file=${LOKI_CONFIG_PATH:-/etc/loki/loki.prod.yml}
       -log.level=${LOG_LEVEL:-info}
-      -validation.allow-structured-metadata=false                                           # Отключаем проверку структурированных метаданных
+      -validation.allow-structured-metadata=false
     user: "0"                                                                               # Запускаем от имени root для решения проблем с правами
     depends_on:
       - minio                                                                               # Зависимость от MinIO
@@ -234,6 +246,7 @@ services:
       - ./env/promtail.prod.env
     volumes:
       - ./promtail/promtail.prod.yml:/etc/promtail/promtail.prod.yml:ro                     # Монтируем конфигурационный файл
+      - ./logs:/logs:ro                                                                     # Доступ к логам микросервисов (только чтение)
       - /var/log:/var/log:ro                                                                # Доступ к логам хоста (только чтение)
       - /var/lib/docker/containers:/var/lib/docker/containers:ro                            # Доступ к логам контейнеров (только чтение)
       - promtail_data:/data                                                                 # Том для хранения позиций
