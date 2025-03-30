@@ -39,6 +39,102 @@ services:
       timeout: 10s
       retries: 3
 
+  # API сервис
+  em-api:
+    build:
+      context: ../em-api
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/api.prod.env
+    expose:
+      - "8080"                                                                                     # Работает внутри сети, порт публиковать не нужно
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - elasticsearch
+      - em-discovery
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Adapter сервис
+  em-adapter:
+    build:
+      context: ../em-adapter
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/adapter.prod.env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    expose:
+      - "8080"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - em-discovery
+      - kafka
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Collector сервис
+  em-collector:
+    build:
+      context: ../em-collector
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/collector.prod.env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    expose:
+      - "8080"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - em-discovery
+      - kafka
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Processor сервис
+  em-processor:
+    build:
+      context: ../em-processor
+      dockerfile: Dockerfile
+    env_file:
+      - ./env/processor.prod.env
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    expose:
+      - "8080"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      - em-discovery
+      - redis
+      - kafka
+    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+
   # Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.1
@@ -68,98 +164,67 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data:rw                                                                         # Постоянное хранение данных Redis между перезапусками
-      - ./redis/redis.prod.conf:/usr/local/etc/redis/redis.conf:ro                                  # Подключаем защищённую конфигурацию Redis
+      - redis_data:/data:rw                                                                 # Постоянное хранение данных Redis между перезапусками
+      - ./redis/redis.prod.conf:/usr/local/etc/redis/redis.conf:ro                          # Подключаем защищённую конфигурацию Redis
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-password}
     command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]                                                          # Проверка через ping
-      interval: 30s                                                                                 # Интервал проверки
-      timeout: 10s                                                                                  # Таймаут ожидания ответа
-      retries: 3                                                                                    # Количество попыток
+      test: [ "CMD", "redis-cli", "ping" ]                                                  # Проверка через ping
+      interval: 30s                                                                         # Интервал проверки
+      timeout: 10s                                                                          # Таймаут ожидания ответа
+      retries: 3                                                                            # Количество попыток
 
-  # API сервис
-  em-api:
-    build:
-      context: ../em-api
-      dockerfile: Dockerfile
-    env_file:
-      - ./env/api.prod.env
-    expose:
-      - "8080"                                                                                     # Работает внутри сети, порт публиковать не нужно
+  # Zookeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.9.0
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000                                                             # Влияет на heartbeats и таймауты
+      ZOOKEEPER_INIT_LIMIT: 5                                                               # Кол-во тиков, которое follower может тратить на начальную синхронизацию с leader
+      ZOOKEEPER_SYNC_LIMIT: 2                                                               # Макс. кол-во тиков для синхронизации состояния между leader и follower
+
     volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - elasticsearch
-      - em-discovery
-    restart: always
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      test: ["CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Adapter сервис
-  em-adapter:
-    build:
-      context: ../em-adapter
-      dockerfile: Dockerfile
-    env_file:
-      - ./env/adapter.prod.env
-    expose:
-      - "8080"
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - em-discovery
     restart: always
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.9.0
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1                                                                    # Уникальный идентификатор брокера в кластере
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181                                               # Адрес Zookeeper для регистрации брокера
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092   # Список адресов, по которым брокер доступен снаружи и внутри контейнера
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT    # Протоколы для каждого listener
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT                                           # Listener, используемый для связи между брокерами
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1                                             # Репликация для топика со смещениями (offsets); 1 для single-broker окружения
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true                                                 # Автоматическое создание топиков при обращении
+      KAFKA_DELETE_TOPIC_ENABLE: true                                                       # Разрешение на удаление топиков
+      KAFKA_LOG_RETENTION_HOURS: 72                                                         # Время хранения сообщений в часах
+      KAFKA_NUM_PARTITIONS: 3                                                               # Кол-во партиций по умолчанию при создании топика
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1                                                   # Коэффициент репликации по умолчанию
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824                                                   # Размер сегмента логов (1 ГБ)
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000                                         # Интервал проверки просроченных логов (в мс)
+    volumes:
+      - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Collector сервис
-  em-collector:
-    build:
-      context: ../em-collector
-      dockerfile: Dockerfile
-    env_file:
-      - ./env/collector.prod.env
-    expose:
-      - "8080"
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - em-discovery
     restart: always
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Processor сервис
-  em-processor:
-    build:
-      context: ../em-processor
-      dockerfile: Dockerfile
-    env_file:
-      - ./env/processor.prod.env
-    expose:
-      - "8080"
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - em-discovery
-      - redis
-    restart: always
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081/actuator/health" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Prometheus - система мониторинга и сбора метрик
   prometheus:
@@ -306,4 +371,10 @@ volumes:
   loki_wal:                                                                                 # Том для хранения WAL Loki
     driver: local
   promtail_data:                                                                            # Том для хранения данных Promtail
+    driver: local
+  kafka_data:                                                                               # Том для хранения данных Kafka
+    driver: local
+  zookeeper_data:                                                                           # Том для хранения данных Zookeeper
+    driver: local
+  zookeeper_log:                                                                            # Том для хранения логов Zookeeper
     driver: local
