@@ -12,6 +12,14 @@ services:
       - ./logs:/app/logs
     environment:
       - SPRING_PROFILES_ACTIVE=dev
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'  # Ограничение в 25% одного ядра CPU
+          memory: '384M' # Ограничение в 384 мегабайт RAM
+        reservations:
+          cpus: '0.1' # Гарантировать 10% одного ядра CPU
+          memory: '128M' # Гарантировать 128 мегабайт RAM
 
   # API Gateway
   em-gateway:
@@ -26,6 +34,14 @@ services:
       - ./logs:/app/logs
     environment:
       - SPRING_PROFILES_ACTIVE=dev
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: '256M'
+        reservations:
+          cpus: '0.15'
+          memory: '128M'
 
   # API сервис
   em-api:
@@ -41,12 +57,21 @@ services:
       - ./logs:/app/logs
     environment:
       - SPRING_PROFILES_ACTIVE=dev
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
   # Adapter сервис
   em-adapter:
+    # При использовании внешнего хранилища для общей либы значения вернуть к исходным ../em-adapter и Dockerfile
     build:
-      context: ../em-adapter
-      dockerfile: Dockerfile
+      context: ..                          # Родительская директория (EventMosaic/)
+      dockerfile: em-adapter/Dockerfile    # Путь к Dockerfile относительно контекста
     ports:
       - "8082:8080"
     depends_on:
@@ -58,6 +83,14 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
   # Collector сервис
   em-collector:
@@ -75,12 +108,21 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
   # Processor сервис
   em-processor:
+    # При использовании внешнего хранилища для общей либы значения вернуть к исходным ../em-processor и Dockerfile
     build:
-      context: ../em-processor
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: em-processor/Dockerfile
     ports:
       - "8084:8080"
     depends_on:
@@ -93,6 +135,14 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
 # =========================================================================================
 
@@ -105,6 +155,14 @@ services:
     volumes:
       - es_data_dev:/usr/share/elasticsearch/data
       - ./elasticsearch/elasticsearch.dev.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '2G'
+        reservations:
+          cpus: '0.5'
+          memory: '1G'
 
   # Redis
   redis:
@@ -114,6 +172,14 @@ services:
     volumes:
       - ./redis/redis.dev.conf:/usr/local/etc/redis/redis.conf:ro                                   # Монтируем dev конфиг
     command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]                                  # Запускаем с нашим конфигом
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
   # Zookeeper
   zookeeper:
@@ -126,6 +192,14 @@ services:
     volumes:
       - zookeeper_data_dev:/var/lib/zookeeper/data                                                  # Том для хранения данных Zookeeper
       - zookeeper_log_dev:/var/lib/zookeeper/log                                                    # Том для хранения логов Zookeeper
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'  # Ограничение в 25% одного ядра CPU
+          memory: '256M' # Ограничение в 256 мегабайт RAM
+        reservations:
+          cpus: '0.1' # Гарантировать 10% одного ядра CPU
+          memory: '128M' # Гарантировать 128 мегабайт RAM
 
   # Kafka
   kafka:
@@ -146,6 +220,14 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 48                                                                 # Время хранения логов
     volumes:
       - kafka_data_dev:/var/lib/kafka/data                                                          # Том для хранения данных Kafka
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '1G'
+        reservations:
+          cpus: '0.25'
+          memory: '512M'
 
   # Kafka UI
   kafka-ui:
@@ -158,6 +240,14 @@ services:
       KAFKA_CLUSTERS_0_NAME: event-mosaic
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'  # Ограничение в 25% одного ядра CPU
+          memory: '256M' # Ограничение в 256 мегабайт RAM
+        reservations:
+          cpus: '0.1' # Гарантировать 10% одного ядра CPU
+          memory: '128M' # Гарантировать 128 мегабайт RAM
 
   # Prometheus - система мониторинга и сбора метрик
   prometheus:
@@ -173,6 +263,14 @@ services:
       - '--web.console.libraries=/etc/prometheus/console_libraries'                               # Путь к js-библиотекам консоли
       - '--web.console.templates=/etc/prometheus/consoles'                                        # Путь к html-шаблонам консоли
       - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '256'
+        reservations:
+          cpus: '0.25'
+          memory: '128'
 
   # Grafana - система визуализации метрик
   grafana:
@@ -191,6 +289,14 @@ services:
     depends_on:
       - prometheus
       - loki
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
   # Loki - система сбора и хранения логов
   loki:
@@ -210,6 +316,14 @@ services:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
       interval: 30s
       timeout: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '256M'
 
   # Promtail - агент для сбора логов
   promtail:
@@ -224,6 +338,44 @@ services:
       -log.level=${LOG_LEVEL:-info}
     depends_on:
       - loki
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: '128M'
+        reservations:
+          cpus: '0.05'
+          memory: '64M'
+
+  # MinIO - S3-совместимое хранилище для dev
+  minio:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    environment:
+      MINIO_ROOT_USER: eventmosaic
+      MINIO_ROOT_PASSWORD: eventmosaic
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_BUCKET: event-mosaic
+    ports:
+      - "9000:9000" # API порт
+      - "9001:9001" # Консоль
+    volumes:
+      - minio_data_dev:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped # Изменено с always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: '1G'
+        reservations:
+          cpus: '0.25'
+          memory: '512M'
+
 
 volumes:
   es_data_dev:                                                                                    # Том для хранения данных Elasticsearch в dev среде
@@ -241,4 +393,6 @@ volumes:
   zookeeper_data_dev:                                                                             # Том для хранения данных Zookeeper в dev среде
     driver: local
   zookeeper_log_dev:                                                                              # Том для хранения логов Zookeeper в dev среде
+    driver: local
+  minio_data_dev:                                                                                 # Том для хранения данных MinIO в dev среде
     driver: local
