@@ -228,7 +228,9 @@ services:
 
   # Kafka Connect
   kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.9.0
+    build:
+      context: ./kafka-connect                                                               # Путь к директории, где лежит Dockerfile
+      dockerfile: Dockerfile
     ports:
       - "8383:8083" # REST API для управления коннекторами
     depends_on:

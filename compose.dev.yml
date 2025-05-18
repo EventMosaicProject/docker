@@ -175,7 +175,7 @@ services:
 
   # Создание политики, шаблонов индексов для Elasticsearch
   elasticsearch-init:
-    image: alpine/curl:latest                                                                       # Легковесный образ с curl
+    image: alpine/curl:8.12.0                                                                       # Легковесный образ с curl
     depends_on:
       elasticsearch:
         condition: service_healthy                                                                  # Ждем, пока Elasticsearch станет healthy
