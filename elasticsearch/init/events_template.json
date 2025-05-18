@@ -1,0 +1,216 @@
+{
+  "index_patterns": [
+    "gdelt-events-*"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.lifecycle.name": "gdelt_30_day_retention_policy"
+    },
+    "mappings": {
+      "_source": {
+        "enabled": true
+      },
+      "properties": {
+        "globalEventId": {
+          "type": "long"
+        },
+        "eventDate": {
+          "type": "date"
+        },
+        "actor1Code": {
+          "type": "keyword"
+        },
+        "actor1Name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "actor1CountryCode": {
+          "type": "keyword"
+        },
+        "actor1KnownGroupCode": {
+          "type": "keyword"
+        },
+        "actor1EthnicCode": {
+          "type": "keyword"
+        },
+        "actor1Religion1Code": {
+          "type": "keyword"
+        },
+        "actor1Religion2Code": {
+          "type": "keyword"
+        },
+        "actor1Type1Code": {
+          "type": "keyword"
+        },
+        "actor1Type2Code": {
+          "type": "keyword"
+        },
+        "actor1Type3Code": {
+          "type": "keyword"
+        },
+        "actor1GeoType": {
+          "type": "short"
+        },
+        "actor1GeoFullName": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "actor1GeoCountryCode": {
+          "type": "keyword"
+        },
+        "actor1GeoAdm1Code": {
+          "type": "keyword"
+        },
+        "actor1GeoAdm2Code": {
+          "type": "keyword"
+        },
+        "actor1Location": {
+          "type": "geo_point"
+        },
+        "actor1GeoFeatureId": {
+          "type": "keyword"
+        },
+        "actor2Code": {
+          "type": "keyword"
+        },
+        "actor2Name": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "actor2CountryCode": {
+          "type": "keyword"
+        },
+        "actor2KnownGroupCode": {
+          "type": "keyword"
+        },
+        "actor2EthnicCode": {
+          "type": "keyword"
+        },
+        "actor2Religion1Code": {
+          "type": "keyword"
+        },
+        "actor2Religion2Code": {
+          "type": "keyword"
+        },
+        "actor2Type1Code": {
+          "type": "keyword"
+        },
+        "actor2Type2Code": {
+          "type": "keyword"
+        },
+        "actor2Type3Code": {
+          "type": "keyword"
+        },
+        "actor2GeoType": {
+          "type": "short"
+        },
+        "actor2GeoFullName": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "actor2GeoCountryCode": {
+          "type": "keyword"
+        },
+        "actor2GeoAdm1Code": {
+          "type": "keyword"
+        },
+        "actor2GeoAdm2Code": {
+          "type": "keyword"
+        },
+        "actor2Location": {
+          "type": "geo_point"
+        },
+        "actor2GeoFeatureId": {
+          "type": "keyword"
+        },
+        "isRootEvent": {
+          "type": "byte"
+        },
+        "eventCode": {
+          "type": "keyword"
+        },
+        "eventBaseCode": {
+          "type": "keyword"
+        },
+        "eventRootCode": {
+          "type": "keyword"
+        },
+        "quadClass": {
+          "type": "integer"
+        },
+        "goldsteinScale": {
+          "type": "double"
+        },
+        "numMentions": {
+          "type": "integer"
+        },
+        "numSources": {
+          "type": "integer"
+        },
+        "numArticles": {
+          "type": "integer"
+        },
+        "avgTone": {
+          "type": "double"
+        },
+        "actionGeoType": {
+          "type": "integer"
+        },
+        "actionGeoFullName": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "actionGeoCountryCode": {
+          "type": "keyword"
+        },
+        "actionGeoAdm1Code": {
+          "type": "keyword"
+        },
+        "actionGeoAdm2Code": {
+          "type": "keyword"
+        },
+        "actionLocation": {
+          "type": "geo_point"
+        },
+        "actionGeoFeatureId": {
+          "type": "keyword"
+        },
+        "dateAdded": {
+          "type": "date"
+        },
+        "sourceUrl": {
+          "type": "keyword",
+          "index": false
+        }
+      }
+    }
+  }
+}

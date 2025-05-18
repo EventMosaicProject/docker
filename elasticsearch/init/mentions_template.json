@@ -1,0 +1,72 @@
+{
+  "index_patterns": [
+    "gdelt-mentions-*"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "index.lifecycle.name": "gdelt_30_day_retention_policy"
+    },
+    "mappings": {
+      "_source": {
+        "enabled": true
+      },
+      "properties": {
+        "globalEventId": {
+          "type": "long"
+        },
+        "eventTimeDate": {
+          "type": "date"
+        },
+        "mentionTimeDate": {
+          "type": "date"
+        },
+        "mentionType": {
+          "type": "integer"
+        },
+        "mentionSourceName": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "mentionIdentifier": {
+          "type": "keyword"
+        },
+        "sentenceId": {
+          "type": "integer"
+        },
+        "actor1CharOffset": {
+          "type": "integer"
+        },
+        "actor2CharOffset": {
+          "type": "integer"
+        },
+        "actionCharOffset": {
+          "type": "integer"
+        },
+        "inRawText": {
+          "type": "byte"
+        },
+        "confidence": {
+          "type": "integer"
+        },
+        "mentionDocLen": {
+          "type": "integer"
+        },
+        "mentionDocTone": {
+          "type": "double"
+        },
+        "mentionDocTranslationInfo": {
+          "type": "text",
+          "index": false
+        }
+      }
+    }
+  }
+}

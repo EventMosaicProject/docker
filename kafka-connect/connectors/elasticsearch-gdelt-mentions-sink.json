@@ -1,0 +1,34 @@
+{
+  "name": "elasticsearch-gdelt-mentions-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+    "tasks.max": "1",
+    "topics": "gdelt-processor-mention-topic",
+    "connection.url": "http://elasticsearch:9200",
+    "connection.username": "elastic",
+    "connection.password": "elastic",
+    "key.ignore": "false",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "auto.create.indices.at.start": "false",
+    "schema.ignore": "true",
+    "behavior.on.malformed.doc": "warn",
+    "flush.synchronously": "true",
+
+    "transforms": "routeToTimeBasedIndex,removeIndexDateField",
+    "transforms.routeToTimeBasedIndex.type": "org.apache.kafka.connect.transforms.TimestampRouter",
+    "transforms.routeToTimeBasedIndex.topic.format": "gdelt-mentions-${timestamp}",
+    "transforms.routeToTimeBasedIndex.timestamp.field": "elasticIndexDate",
+    "transforms.routeToTimeBasedIndex.timestamp.format": "yyyy-MM-dd",
+
+    "transforms.removeIndexDateField.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.removeIndexDateField.exclude": "elasticIndexDate",
+
+    "errors.tolerance": "all",
+    "errors.log.enable": true,
+    "errors.log.include.messages": true,
+    "errors.deadletterqueue.topic.name": "dlq-gdelt-mention-topic",
+    "errors.deadletterqueue.context.headers.enable": true
+  }
+}

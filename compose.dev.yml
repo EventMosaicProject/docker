@@ -155,6 +155,9 @@ services:
     volumes:
       - es_data_dev:/usr/share/elasticsearch/data
       - ./elasticsearch/elasticsearch.dev.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    environment:
+      - ELASTIC_PASSWORD=elastic
+      - ELASTIC_USERNAME=elastic
     deploy:
       resources:
         limits:
@@ -163,6 +166,23 @@ services:
         reservations:
           cpus: '0.5'
           memory: '1G'
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u \"$ELASTIC_USERNAME:$ELASTIC_PASSWORD\" http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s                                                                             # ES время на первоначальный запуск
+
+  # Создание политики, шаблонов индексов для Elasticsearch
+  elasticsearch-init:
+    image: alpine/curl:latest                                                                       # Легковесный образ с curl
+    depends_on:
+      elasticsearch:
+        condition: service_healthy                                                                  # Ждем, пока Elasticsearch станет healthy
+    volumes:
+      - ./elasticsearch/init:/etc/elasticsearch-init:ro                                             # Монтируем наши скрипты и JSON
+    command: sh /etc/elasticsearch-init/init-es.sh
+    restart: on-failure                                                                             # Перезапустить, если скрипт завершился с ошибкой
 
   # Redis
   redis:
@@ -243,11 +263,56 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'  # Ограничение в 25% одного ядра CPU
-          memory: '256M' # Ограничение в 256 мегабайт RAM
+          cpus: '0.25'        # Ограничение в 25% одного ядра CPU
+          memory: '256M'      # Ограничение в 256 мегабайт RAM
         reservations:
-          cpus: '0.1' # Гарантировать 10% одного ядра CPU
-          memory: '128M' # Гарантировать 128 мегабайт RAM
+          cpus: '0.1'         # Гарантировать 10% одного ядра CPU
+          memory: '128M'      # Гарантировать 128 мегабайт RAM
+
+  # Kafka Connect
+  kafka-connect:
+    build:
+      context: ./kafka-connect                                                                # Путь к директории, где лежит Dockerfile
+      dockerfile: Dockerfile
+    ports:
+      - "8383:8083"                                                                           # REST API для управления коннекторами
+    depends_on:
+      - kafka
+      - elasticsearch
+    volumes:
+      - ./kafka-connect/connectors:/etc/kafka-connect/connector-configs:ro                    # Монтируем наши JSON конфиги коннекторов
+      - ./kafka-connect/register-connectors.sh:/usr/local/bin/register-connectors.sh:ro
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: "kafka:29092"
+      CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
+      CONNECT_REST_PORT: "8083"
+      CONNECT_GROUP_ID: "event-mosaic-connect-dev"
+      CONNECT_CONFIG_STORAGE_TOPIC: "_connect-configs-dev"
+      CONNECT_OFFSET_STORAGE_TOPIC: "_connect-offsets-dev"
+      CONNECT_STATUS_STORAGE_TOPIC: "_connect-status-dev"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_INTERNAL_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+      CONNECT_LOG4J_ROOT_LOGLEVEL: "INFO"
+      CONNECT_LOG4J_LOGGERS: "org.apache.kafka.connect.runtime.rest=WARN,org.reflections=ERROR" # Уменьшаем шум в логах
+      CONNECT_CONNECTOR_CLIENT_CONFIG_OVERRIDE_POLICY: "All"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '1G'
+        reservations:
+          cpus: '0.5'
+          memory: '512M'
 
   # Prometheus - система мониторинга и сбора метрик
   prometheus:

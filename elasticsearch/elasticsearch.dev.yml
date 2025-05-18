@@ -5,12 +5,13 @@ cluster.name: ${CLUSTER_NAME:em-dev-cluster}                # Имя класт�
 node.name: ${NODE_NAME:node-dev}                            # Имя узла
 
 # Сетевые настройки
-network.host: ${NETWORK_HOST:127.0.0.1}                     # Слушаем только локальный интерфейс для безопасности
+network.host: ${NETWORK_HOST:0.0.0.0}                       # Слушаем все интерфейсы
 http.port: ${HTTP_PORT:9200}                                # Порт для REST API (поиск, индексация)
 transport.port: ${TRANSPORT_PORT:9300}                      # Порт для связи между узлами
 
 # Настройки безопасности
-xpack.security.enabled: ${SECURITY_ENABLED:false}           # Отключаем для удобства разработки
+xpack.security.enabled: ${SECURITY_ENABLED:true}            # Отключаем для удобства разработки
+xpack.security.http.ssl.enabled: false                      # https не нужен
 xpack.security.transport.ssl.enabled: false                 # SSL не нужен в dev-режиме
 
 # Пути для данных и логов
